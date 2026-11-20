@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>フォトスリム</title>
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a darkroom work table. Intake tray, a 5MB budget gauge for the whole set, then one strip per photo. */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --ink:#13201F; --muted:#5B6B69; --line:#D3DDDB;
+  --accent:#0B7A74; --accent-ink:#FFFFFF; --accent-soft:#D6ECEA;
+  --ok:#1D7A3E; --warn:#A86200; --err:#B3261E;
+  --meter:#E2E9E8;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1615; --surface:#162120; --ink:#E4EEEC; --muted:#93A6A3; --line:#2A3a38;
+  --accent:#3FC1B8; --accent-ink:#06201E; --accent-soft:#163A37;
+  --ok:#5BD18A; --warn:#F0B35A; --err:#FF8A80; --meter:#22312F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1615; --surface:#162120; --ink:#E4EEEC; --muted:#93A6A3; --line:#2A3a38;
+  --accent:#3FC1B8; --accent-ink:#06201E; --accent-soft:#163A37;
+  --ok:#5BD18A; --warn:#F0B35A; --err:#FF8A80; --meter:#22312F; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:920px;margin:0 auto;padding-block:32px 64px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-direction:column;gap:12px}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.1;margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:.08em;margin-bottom:6px}
+.lede{margin:0;color:var(--muted);max-width:40em}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.tray{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;display:flex;flex-direction:column;align-items:center;gap:8px}
+.drop:hover,.drop.over,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft);outline:none}
+.drop strong{font-size:17px;font-weight:700}
+.drop span{color:var(--muted);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+.group{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.label{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.btn{font:inherit;font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.sm{padding:5px 12px;font-size:13px}
+
+.budget{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.budget-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
+.total{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:clamp(26px,5vw,34px);font-weight:600;line-height:1.1}
+.total small{font-size:15px;color:var(--muted);font-weight:500}
+.status{color:var(--muted);font-size:13px}
+.gauge{position:relative;height:14px;border-radius:7px;background:var(--meter);overflow:hidden}
+.gauge i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:7px;transition:width .4s}
+.budget-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.budget-foot .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.list{display:flex;flex-direction:column;gap:12px}
+.photo{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:16px;align-items:center}
+.thumb{width:88px;height:66px;object-fit:cover;border-radius:6px;background:var(--meter);display:block}
+.meta{min-width:0;display:flex;flex-direction:column;gap:4px}
+.name{font-weight:700;overflow-wrap:anywhere}
+.facts{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12.5px;color:var(--muted);align-items:center}
+.facts b{color:var(--ink);font-weight:600}
+.arrow{color:var(--muted)}
+.pill{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.keep{color:var(--accent)} .pill.err{color:var(--err)} .pill.wait{color:var(--warn)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:30;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal img{max-width:100%;max-height:78vh;border-radius:6px;object-fit:contain}
+.modal p{color:#fff;margin:0;font-size:13px;text-align:center}
+
+@media (max-width:560px){
+  .photo{grid-template-columns:64px minmax(0,1fr)}
+  .thumb{width:64px;height:48px}
+  .photo .actions{grid-column:1/-1;justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1><small>写真をまとめて5MB以内に</small>フォトスリム</h1>
+    <p class="lede">写真を何枚選んでも、全部の合計が5MB以内になるように圧縮します。もともと小さい写真には余計な圧縮をかけず、空いた分を大きい写真に回します。処理はすべてこのブラウザ内で行われ、写真はどこにも送信されません。</p>
+  </header>
+
+  <section class="tray">
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="写真を選ぶ">
+      <strong>ここに写真をドロップ、またはタップして選択</strong>
+      <span>JPEG・PNG・WebP・HEIC（iPhone）など。複数枚まとめて選べます</span>
+    </div>
+    <input type="file" id="file" accept="image/*,.heic,.heif" multiple hidden>
+    <div class="controls">
+      <div class="group">
+        <label class="label" for="fmt">保存形式</label>
+        <select id="fmt">
+          <option value="image/jpeg">JPEG（互換性重視）</option>
+          <option value="image/webp">WebP（同サイズで高画質）</option>
+        </select>
+      </div>
+      <p class="note">5MB = 5,000,000バイト。ZIPにまとめた場合もこの中に収まります。</p>
+    </div>
+  </section>
+
+  <section class="budget" aria-live="polite">
+    <div class="budget-top">
+      <div class="total"><span id="total">0.00</span> <small>/ 5.00 MB</small></div>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="gauge" aria-hidden="true"><i id="gauge" style="width:0%"></i></div>
+    <div class="budget-foot">
+      <span class="status" id="share"></span>
+      <div class="actions">
+        <button class="btn ghost" id="clear" type="button">クリア</button>
+        <button class="btn" id="zip" type="button" disabled>まとめてZIPで保存</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="list" id="list"></div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <img id="modalImg" alt="圧縮後のプレビュー">
+  <p id="modalText"></p>
+  <button class="btn" id="modalClose" type="button">閉じる</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(() => {
+  const MB = 1_000_000;
+  const TOTAL = 5 * MB;
+  const MAX_PIXELS = 16_000_000; // iOS Safari canvas limit
+  const QMAX = 0.92, QMIN = 0.55;
+  const $ = id => document.getElementById(id);
+  const list = $('list'), zipBtn = $('zip');
+
+  // p: {id, name, file, url, img, w, h, state, error, natural:{mime, blob, q, w, h, kept}, limit, result}
+  let photos = [];
+  let nextId = 1;
+  let gen = 0;
+  let loadChain = Promise.resolve();
+  let downloads = null;
+
+  // Inside a Claude artifact the 'downloads' capability exists; on a normal web page it doesn't.
+  if (window.claude?.use) claude.use('downloads').then(d => { downloads = d; }).catch(() => {});
+
+  const fmtBytes = b => b >= MB ? (b / MB).toFixed(2) + ' MB' : Math.round(b / 1000) + ' KB';
+  const mimeNow = () => $('fmt').value;
+  const ext = mime => mime === 'image/webp' ? 'webp' : 'jpg';
+  const baseName = n => n.replace(/\.[^.]+$/, '') || 'photo';
+  const outName = p => `${baseName(p.name)}_slim.${ext(mimeNow())}`;
+  // Room for ZIP headers so the archive itself stays under 5MB too.
+  const budgetFor = n => TOTAL - 4000 - 400 * n;
+
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 3200);
+  }
+
+  function loadImage(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => res({ img, url });
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode')); };
+      img.src = url;
+    });
+  }
+
+  const toBlob = (canvas, mime, q) => new Promise(r => canvas.toBlob(r, mime, q));
+
+  function draw(img, w, h, mime) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    if (mime === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    return c;
+  }
+
+  const capScale = (W, H) => Math.min(1, Math.sqrt(MAX_PIXELS / (W * H)));
+
+  // Size at top quality and full resolution: what this photo needs if nothing forces it smaller.
+  async function naturalSize(p, mime) {
+    const s = capScale(p.w, p.h);
+    const w = Math.round(p.w * s), h = Math.round(p.h * s);
+    const blob = await toBlob(draw(p.img, w, h, mime), mime, QMAX);
+    if (s === 1 && p.file.type === mime && p.file.size <= blob.size) {
+      return { mime, blob: p.file, kept: true, w: p.w, h: p.h };
+    }
+    return { mime, blob, q: QMAX, w, h };
+  }
+
+  // Highest quality that fits; shrink dimensions only when even low quality is too big.
+  async function compress(img, W, H, limit, mime, isStale) {
+    let scale = capScale(W, H);
+    for (let attempt = 0; attempt < 14; attempt++) {
+      if (isStale()) return null;
+      const w = Math.max(1, Math.round(W * scale)), h = Math.max(1, Math.round(H * scale));
+      const c = draw(img, w, h, mime);
+      const top = await toBlob(c, mime, QMAX);
+      if (top.size <= limit) return { blob: top, q: QMAX, w, h };
+      const low = await toBlob(c, mime, QMIN);
+      if (low.size > limit) {
+        scale *= Math.max(0.3, Math.min(0.95, Math.sqrt(limit / low.size) * 0.97));
+        continue;
+      }
+      let lo = QMIN, hi = QMAX, best = { blob: low, q: QMIN };
+      for (let i = 0; i < 6; i++) {
+        if (isStale()) return null;
+        const mid = (lo + hi) / 2;
+        const b = await toBlob(c, mime, mid);
+        if (b.size <= limit) { best = { blob: b, q: mid }; lo = mid; } else hi = mid;
+      }
+      return { ...best, w, h };
+    }
+    throw new Error('too-small');
+  }
+
+  // Water-filling: photos that are small anyway keep their natural size; the rest share what's left equally.
+  function allocate(items, budget) {
+    const sorted = [...items].sort((a, b) => a.natural.blob.size - b.natural.blob.size);
+    let remaining = budget, k = sorted.length;
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const share = Math.floor(remaining / k);
+      if (p.natural.blob.size <= share) {
+        p.limit = p.natural.blob.size; remaining -= p.limit; k--;
+      } else {
+        for (let j = i; j < sorted.length; j++) sorted[j].limit = share;
+        return share;
+      }
+    }
+    return null;
+  }
+
+  // ---------- HEIC ----------
+  async function isHeic(file) {
+    if (/^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) return true;
+    try {
+      const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+      const s = String.fromCharCode(...head.slice(4, 12));
+      return /^ftyp(heic|heix|hevc|hevx|heim|heis|mif1|msf1)/.test(s);
+    } catch { return false; }
+  }
+
+  let heicLib = null;
+  function loadHeicLib() {
+    if (window.heic2any) return Promise.resolve(window.heic2any);
+    if (!heicLib) heicLib = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+      s.onload = () => window.heic2any ? res(window.heic2any) : rej(new Error('lib'));
+      s.onerror = () => { heicLib = null; rej(new Error('lib')); };
+      document.head.append(s);
+    });
+    return heicLib;
+  }
+
+  async function heicToJpeg(file) {
+    const heic2any = await loadHeicLib();
+    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.98 });
+    return Array.isArray(out) ? out[0] : out;
+  }
+
+  async function load(p) {
+    try {
+      // Safari can decode HEIC natively; other browsers fall through to the converter.
+      const { img, url } = await loadImage(p.file);
+      Object.assign(p, { url, img, w: img.naturalWidth, h: img.naturalHeight, state: 'waiting' });
+    } catch {
+      if (await isHeic(p.file)) {
+        p.state = 'converting'; render();
+        try {
+          const jpeg = await heicToJpeg(p.file);
+          const { img, url } = await loadImage(jpeg);
+          Object.assign(p, { url, img, w: img.naturalWidth, h: img.naturalHeight, state: 'waiting' });
+        } catch (e) {
+          p.state = 'error';
+          p.error = e?.message === 'lib'
+            ? 'HEIC変換の部品を読み込めませんでした。通信状況を確認して、もう一度選んでください。'
+            : 'このHEICファイルは変換できませんでした。写真アプリからJPEGで書き出してから選んでください。';
+        }
+      } else {
+        p.state = 'error';
+        p.error = 'この形式は読み込めませんでした。JPEG・PNG・WebP・HEICの画像を選んでください。';
+      }
+    }
+    render();
+  }
+
+  // ---------- pipeline ----------
+  function schedule() {
+    const g = ++gen;
+    photos.forEach(p => { if (p.img) { p.result = null; if (p.state !== 'error') p.state = 'waiting'; } });
+    render();
+    run(g);
+  }
+
+  async function run(g) {
+    const stale = () => g !== gen;
+    await loadChain;
+    if (stale()) return;
+    const mime = mimeNow();
+    const items = photos.filter(p => p.img);
+    if (!items.length) { render(); return; }
+
+    for (const p of items) {
+      if (p.natural?.mime === mime) continue;
+      p.state = 'measuring'; render();
+      p.natural = await naturalSize(p, mime);
+      if (stale()) return;
+    }
+
+    allocate(items, budgetFor(items.length));
+
+    for (const p of items) {
+      if (stale()) return;
+      if (p.limit >= p.natural.blob.size) {
+        p.result = { ...p.natural, untouched: true };
+        p.state = 'done'; render(); continue;
+      }
+      p.state = 'compressing'; render();
+      try {
+        const r = await compress(p.img, p.w, p.h, p.limit, mime, stale);
+        if (!r || stale()) return;
+        p.result = r; p.state = 'done';
+      } catch {
+        p.state = 'error'; p.error = '5MBの枠に収まりませんでした。枚数を減らしてください。';
+      }
+      render();
+    }
+  }
+
+  function addFiles(files) {
+    const added = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i.test(file.name)) continue;
+      const p = { id: nextId++, name: file.name, file, state: 'loading', error: null };
+      photos.push(p); added.push(p);
+    }
+    if (!added.length) { toast('画像ファイルが見つかりませんでした'); return; }
+    for (const p of added) loadChain = loadChain.then(() => load(p));
+    schedule();
+  }
+
+  function remove(p) {
+    photos = photos.filter(x => x !== p);
+    if (p.url) URL.revokeObjectURL(p.url);
+    schedule();
+  }
+
+  // ---------- render ----------
+  const STATE_LABEL = { loading: '読み込み中', converting: 'HEICを変換中', waiting: '待機中', measuring: '解析中', compressing: '圧縮中' };
+
+  function render() {
+    const done = photos.filter(p => p.result);
+    const total = done.reduce((s, p) => s + p.result.blob.size, 0);
+    const busy = photos.some(p => p.state !== 'done' && p.state !== 'error');
+    const ok = photos.filter(p => p.state !== 'error').length;
+
+    $('total').textContent = (total / MB).toFixed(2);
+    $('gauge').style.width = Math.min(100, total / TOTAL * 100) + '%';
+    $('status').textContent = photos.length === 0 ? '写真を選ぶと、ここに合計サイズが出ます'
+      : busy ? `圧縮中… ${done.length} / ${ok}枚` : `${done.length}枚 · 合計5MB以内に収まりました`;
+    const shares = photos.filter(p => p.limit && p.result && !p.result.untouched).map(p => p.limit);
+    $('share').textContent = shares.length ? `1枚あたりの上限 ${fmtBytes(Math.min(...shares))}` : '';
+    zipBtn.disabled = busy || done.length === 0;
+
+    list.replaceChildren(...photos.map(p => {
+      const el = document.createElement('article');
+      el.className = 'photo';
+      el.innerHTML = `<img class="thumb" alt="">
+        <div class="meta"><div class="name"></div><div class="facts"></div></div>
+        <div class="actions"></div>`;
+      if (p.url) el.querySelector('img').src = p.url;
+      el.querySelector('.name').textContent = p.name;
+      const facts = el.querySelector('.facts');
+      const orig = `<span class="mono">${fmtBytes(p.file.size)}${p.w ? ` · ${p.w}×${p.h}` : ''}</span>`;
+      if (p.state === 'error') {
+        facts.innerHTML = `<span class="pill err">エラー</span><span></span>`;
+        facts.lastChild.textContent = p.error;
+      } else if (p.result) {
+        const r = p.result;
+        const pill = r.untouched ? '<span class="pill keep">圧縮不要</span>' : '<span class="pill ok">完了</span>';
+        const extra = r.kept ? '元のまま' : `${r.w}×${r.h}${r.w < p.w ? `（${Math.round(r.w / p.w * 100)}%）` : ''} · 画質 ${Math.round(r.q * 100)}`;
+        facts.innerHTML = `${pill}${orig}<span class="arrow">→</span><span><b class="mono">${fmtBytes(r.blob.size)}</b></span><span class="mono">${extra}</span>`;
+      } else {
+        facts.innerHTML = `<span class="pill wait">${STATE_LABEL[p.state] || '処理中'}</span>${orig}`;
+      }
+      const act = el.querySelector('.actions');
+      if (p.result) {
+        const view = Object.assign(document.createElement('button'), { className: 'btn ghost sm', type: 'button', textContent: '確認' });
+        view.onclick = () => preview(p);
+        const save = Object.assign(document.createElement('button'), { className: 'btn ghost sm', type: 'button', textContent: '保存' });
+        save.onclick = () => saveFile(outName(p), p.result.blob, () => preview(p));
+        act.append(view, save);
+      }
+      const del = Object.assign(document.createElement('button'), { className: 'btn ghost sm', type: 'button', textContent: '削除' });
+      del.onclick = () => remove(p);
+      act.append(del);
+      return el;
+    }));
+  }
+
+  function preview(p) {
+    const r = p.result, img = $('modalImg');
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    const url = URL.createObjectURL(r.blob);
+    img.src = url; img.dataset.url = url;
+    $('modalText').textContent = `${outName(p)} · ${fmtBytes(r.blob.size)} · ${r.w}×${r.h}px — 画像を長押し／右クリックしても保存できます`;
+    $('modal').hidden = false;
+    $('modalClose').focus();
+  }
+  $('modalClose').onclick = () => $('modal').hidden = true;
+  $('modal').onclick = e => { if (e.target.id === 'modal') $('modal').hidden = true; };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').hidden = true; });
+
+  // Normal browser download (used when the page runs outside a Claude artifact).
+  function browserDownload(filename, blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  async function saveFile(filename, blob, fallback) {
+    if (!downloads) {
+      browserDownload(filename, blob);
+      toast(`${filename} を保存しました`);
+      return;
+    }
+    try {
+      await downloads.save({ filename, data: blob });
+      toast(`${filename} を保存しました`);
+    } catch (e) {
+      const c = e?.code;
+      if (c === 'declined') return;
+      if (c === 'rate_limited') toast('保存の確認画面がすでに開いています。少し待ってから試してください');
+      else if (fallback) { fallback(); toast('画像を長押し／右クリックして保存してください'); }
+      else toast('保存できませんでした');
+    }
+  }
+
+  zipBtn.onclick = async () => {
+    if (!window.JSZip) { toast('ZIP機能を読み込めませんでした。1枚ずつ保存してください'); return; }
+    zipBtn.disabled = true; const label = zipBtn.textContent; zipBtn.textContent = 'ZIP作成中…';
+    try {
+      const zip = new JSZip(); const used = new Set();
+      for (const p of photos) {
+        if (!p.result) continue;
+        let n = outName(p), i = 2;
+        while (used.has(n)) n = outName(p).replace(/(\.\w+)$/, `-${i++}$1`);
+        used.add(n); zip.file(n, p.result.blob);
+      }
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+      await saveFile('photoslim.zip', blob, null);
+    } finally { zipBtn.textContent = label; render(); }
+  };
+
+  $('clear').onclick = () => { photos.forEach(p => p.url && URL.revokeObjectURL(p.url)); photos = []; schedule(); };
+  $('fmt').addEventListener('change', schedule);
+
+  const drop = $('drop'), input = $('file');
+  drop.onclick = () => input.click();
+  drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+  input.onchange = () => { addFiles([...input.files]); input.value = ''; };
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+  document.addEventListener('paste', e => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (files.length) addFiles(files);
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
